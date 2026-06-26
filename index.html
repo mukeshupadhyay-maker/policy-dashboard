@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Policy Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6fa;color:#1a1a2e;min-height:100vh}
+.header{background:#fff;border-bottom:1px solid #e5e7eb;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.header h1{font-size:20px;font-weight:600;color:#1a1a2e}
+.header p{font-size:13px;color:#6b7280;margin-top:2px}
+.badge{background:#EEF2FF;color:#4338CA;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500}
+.main{padding:1.5rem 2rem;max-width:1400px;margin:0 auto}
+.filters{background:#fff;border-radius:10px;padding:0.875rem 1rem;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:1.25rem;border:1px solid #e5e7eb}
+.filters label{font-size:13px;color:#6b7280;font-weight:500}
+select{font-size:13px;padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#1a1a2e;cursor:pointer}
+select:focus{outline:2px solid #4338CA;border-color:transparent}
+.reset-btn{font-size:12px;padding:5px 12px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;color:#6b7280}
+.reset-btn:hover{background:#f9fafb}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:1.25rem}
+.kpi{background:#fff;border-radius:10px;padding:1rem 1.25rem;border:1px solid #e5e7eb;border-left-width:4px}
+.kpi .label{font-size:12px;color:#6b7280;margin-bottom:4px}
+.kpi .value{font-size:22px;font-weight:600}
+.kpi .sub{font-size:11px;color:#9ca3af;margin-top:3px}
+.tabs{display:flex;gap:4px;margin-bottom:1rem;border-bottom:1px solid #e5e7eb}
+.tab{padding:7px 18px;font-size:13px;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;color:#6b7280;font-weight:500}
+.tab.active{color:#4338CA;border-bottom-color:#4338CA}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.chart-card{background:#fff;border-radius:10px;padding:1.25rem;border:1px solid #e5e7eb}
+.chart-title{font-size:14px;font-weight:600;color:#1a1a2e;margin-bottom:12px}
+.chart-wrap{position:relative;height:220px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.legend-item{font-size:11px;display:flex;align-items:center;gap:4px;color:#6b7280}
+.legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead tr{border-bottom:1px solid #e5e7eb}
+th{padding:8px 10px;text-align:right;font-weight:500;color:#6b7280;font-size:12px}
+th:first-child{text-align:left}
+tbody tr{border-bottom:1px solid #f3f4f6}
+tbody tr:hover{background:#f9fafb}
+td{padding:8px 10px;text-align:right;color:#374151}
+td:first-child{text-align:left;font-weight:500;color:#1a1a2e}
+.table-card{background:#fff;border-radius:10px;padding:1.25rem;border:1px solid #e5e7eb;margin-bottom:14px}
+.ai-card{background:#fff;border-radius:10px;padding:1.5rem;border:1px solid #e5e7eb}
+.ai-input-row{display:flex;gap:8px;margin-bottom:1rem}
+.ai-input-row input{flex:1;padding:8px 12px;font-size:13px;border:1px solid #d1d5db;border-radius:6px}
+.ai-input-row input:focus{outline:2px solid #4338CA;border-color:transparent}
+.ask-btn{padding:8px 18px;font-size:13px;background:#4338CA;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:500}
+.ask-btn:hover{background:#3730a3}
+.ask-btn:disabled{background:#9ca3af;cursor:not-allowed}
+.ai-answer{background:#f5f3ff;border-radius:8px;padding:1rem;font-size:14px;color:#1a1a2e;line-height:1.6;border-left:3px solid #4338CA}
+.ai-label{font-size:11px;color:#7c3aed;margin-bottom:6px;font-weight:600}
+.suggestions{margin-top:1rem}
+.suggestions p{font-size:12px;color:#9ca3af;margin-bottom:6px}
+.sugg-pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-size:12px;padding:4px 12px;border:1px solid #e5e7eb;border-radius:20px;background:#fff;cursor:pointer;color:#6b7280}
+.pill:hover{background:#f5f3ff;border-color:#a78bfa;color:#4338CA}
+.footer{text-align:center;font-size:11px;color:#9ca3af;padding:1.5rem;margin-top:1rem}
+.bar-track{background:#f3f4f6;border-radius:4px;height:6px;margin-top:4px}
+.bar-fill{height:6px;border-radius:4px;background:#4338CA}
+@media(max-width:768px){.charts-grid{grid-template-columns:1fr}.main{padding:1rem}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Policy Analytics Dashboard</h1>
+    <p id="subtitle">Loading data…</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="badge" id="last-refresh">Refreshing…</span>
+  </div>
+</div>
+
+<div class="main">
+  <div class="filters">
+    <label>Filters:</label>
+    <select id="f-partner"><option value="All">Partner: All</option></select>
+    <select id="f-type"><option value="All">Policy Type: All</option></select>
+    <select id="f-insurer"><option value="All">Insurer: All</option></select>
+    <select id="f-state"><option value="All">State: All</option></select>
+    <select id="f-newrenew"><option value="All">New/Renew: All</option><option>New</option><option>Renewal</option></select>
+    <button class="reset-btn" onclick="resetFilters()">✕ Reset</button>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi" style="border-left-color:#4338CA"><div class="label">Total Policies</div><div class="value" id="k-total">—</div><div class="sub" id="k-total-sub"></div></div>
+    <div class="kpi" style="border-left-color:#059669"><div class="label">Total Premium (incl. GST)</div><div class="value" id="k-premium">—</div><div class="sub" id="k-premium-sub"></div></div>
+    <div class="kpi" style="border-left-color:#7C3AED"><div class="label">Total Sum Insured</div><div class="value" id="k-si">—</div><div class="sub"></div></div>
+    <div class="kpi" style="border-left-color:#D97706"><div class="label">Avg Premium / Policy</div><div class="value" id="k-avg">—</div><div class="sub"></div></div>
+    <div class="kpi" style="border-left-color:#10B981"><div class="label">Renewal Rate</div><div class="value" id="k-renew">—</div><div class="sub" id="k-renew-sub"></div></div>
+    <div class="kpi" style="border-left-color:#EF4444"><div class="label">Chronic Disease Members</div><div class="value" id="k-chronic">—</div><div class="sub"></div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('overview',this)">Overview</button>
+    <button class="tab" onclick="switchTab('reports',this)">Reports</button>
+    <button class="tab" onclick="switchTab('ai',this)">AI Assistant</button>
+  </div>
+
+  <!-- Overview -->
+  <div id="tab-overview">
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Policy type distribution</div>
+        <div class="chart-wrap"><canvas id="c-donut" role="img" aria-label="Policy type donut chart">Policy type distribution</canvas></div>
+        <div class="legend" id="leg-donut"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Monthly enrollment trend</div>
+        <div class="chart-wrap"><canvas id="c-line" role="img" aria-label="Monthly policy enrollment trend">Monthly enrollment</canvas></div>
+      </div>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Premium by partner business</div>
+        <div class="chart-wrap"><canvas id="c-bar" role="img" aria-label="Bar chart of premium by partner">Partner premium</canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Pre-existing disease profile</div>
+        <div class="chart-wrap"><canvas id="c-disease" role="img" aria-label="Disease profile horizontal bar">Disease profile</canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reports -->
+  <div id="tab-reports" style="display:none">
+    <div class="table-card">
+      <div class="chart-title" style="margin-bottom:12px">Insurer-wise performance</div>
+      <table><thead><tr><th style="text-align:left">Insurer</th><th>Policies</th><th>Premium (₹L)</th><th>Sum Insured (₹Cr)</th><th>Avg Premium</th><th>Share %</th></tr></thead>
+      <tbody id="tbl-insurer"></tbody></table>
+    </div>
+    <div class="table-card">
+      <div class="chart-title" style="margin-bottom:12px">State-wise distribution</div>
+      <table><thead><tr><th style="text-align:left">State</th><th>Policies</th><th>Share %</th><th>Premium (₹L)</th><th>Visual</th></tr></thead>
+      <tbody id="tbl-state"></tbody></table>
+    </div>
+    <div class="table-card">
+      <div class="chart-title" style="margin-bottom:12px">Payment mode breakdown</div>
+      <table><thead><tr><th style="text-align:left">Pay Mode</th><th>Policies</th><th>Share %</th><th>Premium (₹L)</th></tr></thead>
+      <tbody id="tbl-pay"></tbody></table>
+    </div>
+  </div>
+
+  <!-- AI -->
+  <div id="tab-ai" style="display:none">
+    <div class="ai-card">
+      <div class="chart-title" style="margin-bottom:4px">AI Policy Analyst</div>
+      <p style="font-size:13px;color:#9ca3af;margin-bottom:1rem">Ask anything about the filtered data. Answers are based on real numbers from the dashboard.</p>
+      <div class="ai-input-row">
+        <input id="ai-q" type="text" placeholder="e.g. Which insurer has the best renewal rate?" onkeydown="if(event.key==='Enter')askAI()"/>
+        <button class="ask-btn" id="ai-btn" onclick="askAI()">Ask →</button>
+      </div>
+      <div id="ai-answer" style="display:none" class="ai-answer"><div class="ai-label">AI ANALYST</div><div id="ai-text"></div></div>
+      <div class="suggestions">
+        <p>Suggested questions:</p>
+        <div class="sugg-pills">
+          <button class="pill" onclick="setQ(this)">Which state has highest premium?</button>
+          <button class="pill" onclick="setQ(this)">What is the gender split?</button>
+          <button class="pill" onclick="setQ(this)">Which plan type is most popular?</button>
+          <button class="pill" onclick="setQ(this)">How many have chronic diseases?</button>
+          <button class="pill" onclick="setQ(this)">Which insurer has most renewals?</button>
+          <button class="pill" onclick="setQ(this)">What is the average sum insured?</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Policy Analytics Dashboard · Data refreshes on page reload · Replace policy_data.csv and refresh
+</div>
+
+<script>
+const COLORS=["#4338CA","#059669","#D97706","#EF4444","#7C3AED","#10B981","#F59E0B","#6366F1","#EC4899","#14B8A6"];
+let ALL=[], FILTERED=[], charts={};
+
+function fmt(n){return isNaN(n)?'0':Math.round(n).toLocaleString('en-IN')}
+function fmtL(n){return isNaN(n)?'0':(n/1e5).toFixed(2)+' L'}
+function fmtCr(n){return isNaN(n)?'0':(n/1e7).toFixed(2)+' Cr'}
+function fmtCrPlain(n){return isNaN(n)?0:parseFloat((n/1e7).toFixed(2))}
+
+function unique(arr,key){return['All',...new Set(arr.map(r=>r[key]).filter(Boolean))]}
+
+function populate(id,opts){
+  const s=document.getElementById(id);const v=s.value;
+  s.innerHTML=opts.map(o=>`<option>${o}</option>`).join('');
+  if(opts.includes(v))s.value=v;
+}
+
+function initFilters(){
+  populate('f-partner',unique(ALL,'Partner_Business'));
+  populate('f-type',unique(ALL,'policy_type'));
+  populate('f-insurer',unique(ALL,'Insurer'));
+  populate('f-state',unique(ALL,'State'));
+}
+
+function getFilters(){
+  return{
+    partner:document.getElementById('f-partner').value,
+    type:document.getElementById('f-type').value,
+    insurer:document.getElementById('f-insurer').value,
+    state:document.getElementById('f-state').value,
+    nr:document.getElementById('f-newrenew').value
+  };
+}
+
+function applyFilters(){
+  const f=getFilters();
+  FILTERED=ALL.filter(r=>
+    (f.partner==='All'||r.Partner_Business===f.partner)&&
+    (f.type==='All'||r.policy_type===f.type)&&
+    (f.insurer==='All'||r.Insurer===f.insurer)&&
+    (f.state==='All'||r.State===f.state)&&
+    (f.nr==='All'||r.Policy_New_Renew===f.nr)
+  );
+  updateAll();
+}
+
+function resetFilters(){
+  ['f-partner','f-type','f-insurer','f-state','f-newrenew'].forEach(id=>document.getElementById(id).value='All');
+  applyFilters();
+}
+
+function updateKPIs(){
+  const d=FILTERED;
+  const prem=d.reduce((s,r)=>s+(parseFloat(r.Premium_inc_GST)||0),0);
+  const si=d.reduce((s,r)=>s+(parseFloat(r.Sum_Insured)||0),0);
+  const renew=d.filter(r=>r.Policy_New_Renew==='Renewal').length;
+  const chronic=d.filter(r=>r.Members_Having_Chronic_Disease==='Yes').length;
+  document.getElementById('k-total').textContent=fmt(d.length);
+  document.getElementById('k-total-sub').textContent='of '+fmt(ALL.length)+' total';
+  document.getElementById('k-premium').textContent='₹'+fmtL(prem);
+  document.getElementById('k-premium-sub').textContent='excl GST: ₹'+fmtL(d.reduce((s,r)=>s+(parseFloat(r.Premium_exc_GST)||0),0));
+  document.getElementById('k-si').textContent='₹'+fmtCr(si);
+  document.getElementById('k-avg').textContent=d.length?'₹'+fmt(prem/d.length):'—';
+  document.getElementById('k-renew').textContent=d.length?((renew/d.length)*100).toFixed(1)+'%':'—';
+  document.getElementById('k-renew-sub').textContent=fmt(renew)+' renewals';
+  document.getElementById('k-chronic').textContent=d.length?((chronic/d.length)*100).toFixed(1)+'%':'—';
+}
+
+function groupBy(arr,key,valFn){
+  const m={};
+  arr.forEach(r=>{const k=r[key]||'Unknown';if(!m[k])m[k]={count:0,val:0};m[k].count++;m[k].val+=valFn(r);});
+  return Object.entries(m).sort((a,b)=>b[1].count-a[1].count);
+}
+
+function makeChart(id,config){
+  if(charts[id]){charts[id].destroy();}
+  charts[id]=new Chart(document.getElementById(id),config);
+}
+
+function updateCharts(){
+  const d=FILTERED;
+  // Donut
+  const ptMap={};d.forEach(r=>{ptMap[r.policy_type]=(ptMap[r.policy_type]||0)+1;});
+  const ptL=Object.keys(ptMap),ptV=ptL.map(k=>ptMap[k]);
+  makeChart('c-donut',{type:'doughnut',data:{labels:ptL,datasets:[{data:ptV,backgroundColor:COLORS,borderWidth:2,borderColor:'#fff',hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw} (${((ctx.raw/d.length)*100).toFixed(1)}%)`}}}}});
+  const leg=document.getElementById('leg-donut');
+  leg.innerHTML=ptL.map((l,i)=>`<span class="legend-item"><span class="legend-dot" style="background:${COLORS[i%10]}"></span>${l} (${ptV[i]})</span>`).join('');
+
+  // Line - monthly
+  const mMap={};d.forEach(r=>{const m=(r.Enrollment_Date||'').slice(0,7);if(m)mMap[m]=(mMap[m]||0)+1;});
+  const mK=Object.keys(mMap).sort();
+  makeChart('c-line',{type:'line',data:{labels:mK,datasets:[{label:'Policies',data:mK.map(k=>mMap[k]),borderColor:'#4338CA',backgroundColor:'rgba(67,56,202,0.08)',tension:0.4,fill:true,pointRadius:3,pointBackgroundColor:'#4338CA'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10},maxRotation:45,autoSkip:true,maxTicksLimit:12}},y:{beginAtZero:true,ticks:{stepSize:1}}}}});
+
+  // Bar - partner premium
+  const pMap={};d.forEach(r=>{pMap[r.Partner_Business]=(pMap[r.Partner_Business]||0)+(parseFloat(r.Premium_inc_GST)||0);});
+  const pE=Object.entries(pMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  makeChart('c-bar',{type:'bar',data:{labels:pE.map(e=>e[0]),datasets:[{label:'Premium',data:pE.map(e=>Math.round(e[1]/1e5)),backgroundColor:COLORS[0]+'cc',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`₹${ctx.raw.toLocaleString('en-IN')} L`}}},scales:{x:{ticks:{font:{size:11}}},y:{ticks:{callback:v=>'₹'+v+'L'}}}}});
+
+  // Disease
+  const diseases=['Cancer','Brain Stroke','Cardio Vascular Disease','Liver Disease','Immunity Disorder','Endocrine Disorder','Neuro Muscular Disorder'];
+  const dV=diseases.map(dis=>d.filter(r=>parseFloat(r[dis])>0).length);
+  makeChart('c-disease',{type:'bar',data:{labels:diseases.map(ds=>ds.length>16?ds.slice(0,16)+'…':ds),datasets:[{label:'Cases',data:dV,backgroundColor:'#EF4444cc',borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{ticks:{font:{size:11}}}}}});
+}
+
+function updateTables(){
+  const d=FILTERED;
+  const total=d.length;
+  const totalPrem=d.reduce((s,r)=>s+(parseFloat(r.Premium_inc_GST)||0),0);
+
+  // Insurer table
+  const iMap={};
+  d.forEach(r=>{if(!r.Insurer)return;if(!iMap[r.Insurer])iMap[r.Insurer]={count:0,prem:0,si:0};iMap[r.Insurer].count++;iMap[r.Insurer].prem+=parseFloat(r.Premium_inc_GST)||0;iMap[r.Insurer].si+=parseFloat(r.Sum_Insured)||0;});
+  document.getElementById('tbl-insurer').innerHTML=Object.entries(iMap).sort((a,b)=>b[1].count-a[1].count).map(([ins,v])=>`<tr><td>${ins}</td><td>${fmt(v.count)}</td><td>₹${fmtL(v.prem)}</td><td>₹${fmtCr(v.si)}</td><td>₹${fmt(v.prem/v.count)}</td><td>${((v.count/total)*100).toFixed(1)}%</td></tr>`).join('');
+
+  // State table
+  const sMap={};
+  d.forEach(r=>{if(!r.State)return;if(!sMap[r.State])sMap[r.State]={count:0,prem:0};sMap[r.State].count++;sMap[r.State].prem+=parseFloat(r.Premium_inc_GST)||0;});
+  const maxSC=Math.max(...Object.values(sMap).map(v=>v.count));
+  document.getElementById('tbl-state').innerHTML=Object.entries(sMap).sort((a,b)=>b[1].count-a[1].count).slice(0,12).map(([st,v])=>`<tr><td>${st}</td><td>${fmt(v.count)}</td><td>${((v.count/total)*100).toFixed(1)}%</td><td>₹${fmtL(v.prem)}</td><td><div class="bar-track"><div class="bar-fill" style="width:${Math.round((v.count/maxSC)*100)}%"></div></div></td></tr>`).join('');
+
+  // Pay mode
+  const pmMap={};
+  d.forEach(r=>{if(!r.pay_mode)return;if(!pmMap[r.pay_mode])pmMap[r.pay_mode]={count:0,prem:0};pmMap[r.pay_mode].count++;pmMap[r.pay_mode].prem+=parseFloat(r.Premium_inc_GST)||0;});
+  document.getElementById('tbl-pay').innerHTML=Object.entries(pmMap).sort((a,b)=>b[1].count-a[1].count).map(([pm,v])=>`<tr><td>${pm}</td><td>${fmt(v.count)}</td><td>${((v.count/total)*100).toFixed(1)}%</td><td>₹${fmtL(v.prem)}</td></tr>`).join('');
+}
+
+function updateAll(){updateKPIs();updateCharts();updateTables();}
+
+function switchTab(name,el){
+  ['overview','reports','ai'].forEach(t=>{document.getElementById('tab-'+t).style.display='none';});
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).style.display='block';
+  el.classList.add('active');
+}
+
+function setQ(el){document.getElementById('ai-q').value=el.textContent;}
+
+async function askAI(){
+  const q=document.getElementById('ai-q').value.trim();
+  if(!q)return;
+  const btn=document.getElementById('ai-btn');
+  btn.disabled=true;btn.textContent='Thinking…';
+  const d=FILTERED;
+  const prem=d.reduce((s,r)=>s+(parseFloat(r.Premium_inc_GST)||0),0);
+  const renew=d.filter(r=>r.Policy_New_Renew==='Renewal').length;
+  const chronic=d.filter(r=>r.Members_Having_Chronic_Disease==='Yes').length;
+  const sMap={};d.forEach(r=>{sMap[r.State]=(sMap[r.State]||0)+1;});
+  const topStates=Object.entries(sMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]).join(', ');
+  const iMap={};d.forEach(r=>{iMap[r.Insurer]=(iMap[r.Insurer]||0)+1;});
+  const topInsurers=Object.entries(iMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]).join(', ');
+  const gMap={};d.forEach(r=>{gMap[r.gender]=(gMap[r.gender]||0)+1;});
+  const genderStr=Object.entries(gMap).map(e=>e[0]+': '+e[1]).join(', ');
+  const context=`Total policies: ${d.length}. Total premium (incl GST): ₹${fmtL(prem)}. Avg premium: ₹${fmt(d.length?prem/d.length:0)}. Renewal rate: ${d.length?((renew/d.length)*100).toFixed(1):0}%. Chronic disease members: ${((chronic/d.length)*100).toFixed(1)}%. Top states: ${topStates}. Top insurers: ${topInsurers}. Gender: ${genderStr}.`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:500,system:'You are an expert insurance policy analyst AI assistant. Answer in 2-4 concise sentences using the data context provided. Be specific with numbers and insights.',messages:[{role:'user',content:`Dashboard data: ${context}\n\nQuestion: ${q}`}]})});
+    const data=await res.json();
+    document.getElementById('ai-text').textContent=data.content?.[0]?.text||'Unable to get response.';
+    document.getElementById('ai-answer').style.display='block';
+  }catch(e){
+    document.getElementById('ai-text').textContent='AI service unavailable. Check your internet connection and try again.';
+    document.getElementById('ai-answer').style.display='block';
+  }
+  btn.disabled=false;btn.textContent='Ask →';
+}
+
+// Load CSV
+fetch('policy_data.csv')
+  .then(r=>{if(!r.ok)throw new Error('CSV not found');return r.text();})
+  .then(text=>{
+    Papa.parse(text,{header:true,skipEmptyLines:true,complete:res=>{
+      ALL=res.data;
+      FILTERED=[...ALL];
+      initFilters();
+      updateAll();
+      document.getElementById('subtitle').textContent=`policy_data.csv · ${ALL.length.toLocaleString()} policies`;
+      document.getElementById('last-refresh').textContent='Updated: '+new Date().toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
+    }});
+  })
+  .catch(()=>{
+    document.getElementById('subtitle').textContent='policy_data.csv not found — place it in the same folder';
+  });
+
+['f-partner','f-type','f-insurer','f-state','f-newrenew'].forEach(id=>document.getElementById(id).addEventListener('change',applyFilters));
+</script>
+</body>
+</html>
